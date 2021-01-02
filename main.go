@@ -7,10 +7,12 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 var packets chan []byte
-var connections []*websocket.Conn
+//var connections []*websocket.Conn
+var connections sync.Map
 
 // configure handles configuration from env variables
 func configure() {
@@ -41,18 +43,17 @@ func main() {
 func transfer() {
 	for {
 		p := <-packets
-
-		for i, ws := range connections {
+		connections.Range(func(key, value interface{}) bool {
+			ws := key.(*websocket.Conn)
 			if err := ws.WriteMessage(websocket.BinaryMessage, p); err != nil {
 				if err == websocket.ErrCloseSent {
-					// Remove the socket when it's closed
-					connections = append(connections[:i], connections[i+1:]...)
+					log.Println("Closed websocket")
 				} else {
 					log.Println("Error sending message to client:", err)
-					connections = append(connections[:i], connections[i+1:]...)
 				}
 			}
-		}
+			return true
+		})
 	}
 }
 
@@ -84,8 +85,9 @@ func websocketHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error upgrading socket connection:", err)
 		return
 	}
-
-	connections = append(connections, ws)
+	connections.Store(ws, true)
+	defer connections.Delete(ws)
+//	connections = append(connections, ws)
 	websocketReader(ws)
 }
 
