@@ -49,6 +49,7 @@ func transfer() {
 					connections = append(connections[:i], connections[i+1:]...)
 				} else {
 					log.Println("Error sending message to client:", err)
+					connections = append(connections[:i], connections[i+1:]...)
 				}
 			}
 		}
